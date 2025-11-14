@@ -183,6 +183,10 @@ class FlashingIcon extends JLabel implements MouseListener, PropertyChangeListen
                             if (null == currentNotification || null == currentNotification.getBalloonComp()) {
                                 return;
                             }
+                            int timeoutSecs = 3;
+                            if(currentNotification.getPriority() == NotificationDisplayer.Priority.HIGH) {
+                                timeoutSecs = 0;
+                            }
                             BalloonManager.show(FlashingIcon.this,
                                     currentNotification.getBalloonComp(),
                                     null,
@@ -191,7 +195,7 @@ class FlashingIcon extends JLabel implements MouseListener, PropertyChangeListen
                                 public void actionPerformed(ActionEvent e) {
                                     n.markAsRead(true);
                                 }
-                            }, 3 * 1000);
+                            } , timeoutSecs * 1000);
                         }
                     });
                 }
