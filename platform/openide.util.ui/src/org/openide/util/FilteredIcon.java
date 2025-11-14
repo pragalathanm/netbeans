@@ -70,6 +70,14 @@ final class FilteredIcon extends CachedHiDPIIcon {
         }
         return new FilteredIcon(filter, delegate);
     }
+    
+    /*
+     * Disabled icons are already scaled. 
+     */
+    @Override
+    protected double getScale(CachedImageKey key) {
+        return 1;
+    }
 
     @Override
     protected Image createAndPaintImage(

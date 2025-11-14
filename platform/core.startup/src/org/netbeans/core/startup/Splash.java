@@ -168,8 +168,8 @@ public final class Splash implements Stamps.Updater {
                 frame.add(comp, BorderLayout.CENTER);
                 frame.setResizable(false);
 
-                int width = Integer.parseInt(NbBundle.getMessage(Splash.class, "SPLASH_WIDTH"));
-                int height = Integer.parseInt(NbBundle.getMessage(Splash.class, "SPLASH_HEIGHT"));
+                int width = (int) (Integer.parseInt(NbBundle.getMessage(Splash.class, "SPLASH_WIDTH")) * ImageUtilities.getUserScaleFactor());
+                int height = (int) (Integer.parseInt(NbBundle.getMessage(Splash.class, "SPLASH_HEIGHT")) * ImageUtilities.getUserScaleFactor());
                 frame.setPreferredSize(new Dimension(width, height));
 
                 SwingUtilities.invokeLater(new SplashRunner(frame, true));
@@ -378,6 +378,11 @@ public final class Splash implements Stamps.Updater {
             } catch (NumberFormatException nfe) {
                 //ignore - use default size
             }
+            int originalSize = size;
+            final float userScaleFactor = ImageUtilities.getUserScaleFactor();
+            size *= userScaleFactor;
+            bounds.y = (int) (bounds.y * userScaleFactor) + (size - originalSize);
+            
             int horizontalAlignment = LEFT;
             try {
                 switch (bundle.getString(prefix + "HorizontalAlignment").toLowerCase(Locale.US)) {
@@ -455,10 +460,14 @@ public final class Splash implements Stamps.Updater {
             StringTokenizer st = new StringTokenizer(
                     bundle.getString("SplashProgressBarBounds"), " ,"); // NOI18N
             try {
+                float scale = ImageUtilities.getUserScaleFactor();
                 bar = new Rectangle(Integer.parseInt(st.nextToken()),
                         Integer.parseInt(st.nextToken()),
                         Integer.parseInt(st.nextToken()),
                         Integer.parseInt(st.nextToken()));
+                bar.y *= scale;
+                bar.height *= scale;
+                bar.width *= scale;
                 Integer rgb = Integer.decode(bundle.getString("SplashProgressBarColor")); // NOI18N
                 color_bar = new Color(rgb.intValue());
                 rgb = Integer.decode(bundle.getString("SplashProgressBarEdgeColor")); // NOI18N

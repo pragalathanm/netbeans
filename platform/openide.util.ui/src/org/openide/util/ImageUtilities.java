@@ -513,7 +513,15 @@ public final class ImageUtilities {
         if (icon instanceof ToolTipImage tti) {
             return tti;
         }
-        ToolTipImage image = new ToolTipImage(icon, "", url, BufferedImage.TYPE_INT_ARGB);
+        int width = icon.getIconWidth();
+        int height = icon.getIconHeight();
+        if(icon instanceof CachedHiDPIIcon) {
+            float scale = getUserScaleFactor();
+            width *= scale;
+            height *= scale;
+        }
+        
+        ToolTipImage image = new ToolTipImage(icon, "", url, BufferedImage.TYPE_INT_ARGB, width, height);
         Graphics g = image.getGraphics();
         /* Previously, we'd create a new JLabel here every time; this once led to a deadlock on
         startup when the nb.imageicon.filter setting was enabled. The underlying problem is that
@@ -874,7 +882,7 @@ public final class ImageUtilities {
             SVGLoader svgLoader = null; // If not null, url should be loaded as an SVG file.
             ClassLoader useClassLoader =
                     (loader != null) ? loader : ImageUtilities.class.getClassLoader();
-            java.net.URL url = null;
+            HiDPIURL url = null;
             if (n.endsWith(".png") || n.endsWith(".gif") || n.endsWith(".svg")) {
                 /* If an SVG version of the image is available, always load that one. Only attempt
                 to load the SVGLoader implementation module if an actual SVG file exists. */
@@ -882,38 +890,52 @@ public final class ImageUtilities {
                 if (svgURL != null) {
                     svgLoader = getSVGLoader();
                     if (svgLoader != null) {
-                        url = svgURL;
+                        url = new HiDPIURL(svgURL);
                     } else {
                         LOGGER.log(Level.INFO, "No SVG loader available for loading {0}", svgURL);
                     }
                 }
             }
+            float scale = getUserScaleFactor();
             if (url == null && !n.endsWith(".svg")) { // The SVG case was handled before.
-                url = useClassLoader.getResource(n);
+                if (scale > 1) {
+                    url = getHiDPIURL(n, scale, useClassLoader);
+                } 
+                if (url == null) {
+                    // Load base image and scale manually
+                    final URL url2 = useClassLoader.getResource(n);
+                    url = url2 == null ? null : new HiDPIURL(url2);
+                }
             }
 
             Image result = null;
             if (url != null) {
                 if (svgLoader != null) {
                     try {
-                        result = icon2ToolTipImage(svgLoader.loadIcon(url), url);
+                        result = icon2ToolTipImage(svgLoader.loadIcon(url.url), url.url);
                     } catch (IOException ioe) {
                         LOGGER.log(Level.INFO, "Failed to load SVG image " + url, ioe);
                     }
                 } else if (name.endsWith(".png")) {
-                    try (ImageInputStream stream = ImageIO.createImageInputStream(url.openStream())) {
+                    try (ImageInputStream stream = ImageIO.createImageInputStream(url.url.openStream())) {
                         ImageReadParam param = PNG_READER.getDefaultReadParam();
                         PNG_READER.setInput(stream, true, true);
                         result = PNG_READER.read(0, param);
                     } catch (IOException ioe) {
                         LOGGER.log(Level.INFO, "Image "+name+" is not PNG", ioe);
                     }
+                    if (Math.abs(scale - url.loadedImageScale) > 0.01) {
+                        result = scaleImage(result, scale / url.loadedImageScale);
+                    }
                 }
                 if (result == null) {
                     try {
-                        result = ImageIO.read(url);
+                        result = ImageIO.read(url.url);
                     } catch (IOException ioe) {
                         LOGGER.log(Level.WARNING, "Cannot load " + name + " image", ioe);
+                    }
+                    if (Math.abs(scale - url.loadedImageScale) > 0.01) {
+                        result = scaleImage(result, scale / url.loadedImageScale);
                     }
                 }
             }
@@ -927,12 +949,13 @@ public final class ImageUtilities {
                 }
 
                 if (LOGGER.isLoggable(Level.FINE)) {
-                    LOGGER.log(Level.FINE, "loading icon {0} = {1}", new Object[] {n, result});
+                    LOGGER.log(Level.FINE, "loading icon {0} = {1}", new Object[]{n, result});
                 }
+
                 name = new String(name).intern(); // NOPMD
                 ToolTipImage toolTipImage = result instanceof ToolTipImage tti
                         ? tti
-                        : ToolTipImage.createNew("", result, url);
+                        : ToolTipImage.createNew("", result, url.url);
                 cache.put(name, new ActiveRef<>(toolTipImage, cache, name));
                 return toolTipImage;
             } else { // no icon found
@@ -942,6 +965,134 @@ public final class ImageUtilities {
                 return null;
             }
         }
+    }
+
+    private static class HiDPIURL {
+        URL url;
+        float loadedImageScale;
+
+        public HiDPIURL(float loadedImageScale) {
+            this.loadedImageScale = loadedImageScale;
+        }
+
+        public HiDPIURL(URL url) {
+            this.url = url;
+            this.loadedImageScale = 1;
+        }
+
+        @Override
+        public String toString() {
+            return "[scale loaded: " + loadedImageScale + "]" + (url != null ? url.getPath() : "");
+        }
+    }
+    
+    private static HiDPIURL getHiDPIURL(String basePath, float scale, ClassLoader classLoader) {
+        HiDPIURL result = new HiDPIURL(1);
+        int dotIndex = basePath.lastIndexOf('.');
+        String extension = "";
+        String pathWithoutExt = basePath;
+        if (dotIndex != -1) {
+            pathWithoutExt = basePath.substring(0, dotIndex);
+            extension = basePath.substring(dotIndex);
+        }
+        String hiDPIPath = getHiDPIPath(pathWithoutExt, scale) + extension;
+        URL resource = classLoader.getResource(hiDPIPath);
+        if (resource != null) {
+            // direct scaled image is available
+            result.url = resource;
+            result.loadedImageScale = scale;
+            return result;
+        }
+
+        int resolution = 16;
+        String pathWithoutRes = pathWithoutExt;
+        try {
+            resolution = Integer.parseInt(pathWithoutExt.substring(pathWithoutExt.length() - 2));
+            pathWithoutRes = pathWithoutExt.substring(0, pathWithoutExt.length() - 2);
+        } catch (Exception ex) {
+        }
+        if (resolution == 16) {
+            if (scale <= 1.5) {
+                pathWithoutExt = pathWithoutRes + 24;
+                result.loadedImageScale = 1.5f;
+            } else {
+                pathWithoutExt = pathWithoutRes + 32;
+                result.loadedImageScale = 2f;
+            }
+        } else if (resolution == 24) {
+            if (scale <= 1.5) {
+                pathWithoutExt = pathWithoutRes + 32;
+                result.loadedImageScale = 1.5f;
+            } else {
+                pathWithoutExt = pathWithoutRes + 48;
+                result.loadedImageScale = 2f;
+            }
+        } else if (resolution == 32) {
+            pathWithoutExt = pathWithoutRes + 48;
+            result.loadedImageScale = 1.5f;
+        }
+        hiDPIPath = pathWithoutExt + extension;
+        URL url = classLoader.getResource(hiDPIPath);
+        if(url == null) {
+            return null;
+        }
+        result.url = url;
+        return result;
+    }
+    
+    /**
+     * Get the path for a HiDPI version of an icon.
+     */
+    private static String getHiDPIPath(String pathWithoutExt, float scale) {
+        return pathWithoutExt + "@" + formatScale(scale) + "x";
+    }
+
+    private static String formatScale(float scale) {
+        if (scale == (int) scale) {
+            return String.valueOf((int) scale);
+        }
+        return String.valueOf(scale);
+    }
+
+    /**
+     * Scale an image by the given factor using high-quality rendering.
+     */
+    private static Image scaleImage(Image original, float scaleFactor) {
+        int originalWidth = original.getWidth(null);
+        int originalHeight = original.getHeight(null);
+
+        int scaledWidth = Math.round(originalWidth * scaleFactor);
+        int scaledHeight = Math.round(originalHeight * scaleFactor);
+
+        // Use high-quality scaling
+        BufferedImage scaledImage = new BufferedImage(
+                scaledWidth, scaledHeight, BufferedImage.TYPE_INT_ARGB
+        );
+
+        Graphics2D g2d = scaledImage.createGraphics();
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING,
+                RenderingHints.VALUE_RENDER_QUALITY);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+
+        g2d.drawImage(original, 0, 0, scaledWidth, scaledHeight, null);
+        g2d.dispose();
+
+        return scaledImage;
+    }
+
+    public static float getUserScaleFactor() {
+        try {
+            String prop = System.getProperty("user.scale.factor");
+            if (prop != null && !prop.isEmpty()) {
+                return Float.parseFloat(prop);
+            }
+        } catch (Exception ex) {
+            // ignore
+        }
+        return 1f;
     }
 
     private static void ensureLoaded(Image image) {
@@ -1254,10 +1405,9 @@ public final class ImageUtilities {
         /**
          * @param url may be null
          */
-        public ToolTipImage(Icon delegateIcon, String toolTipText, URL url, int imageType) {
+        public ToolTipImage(Icon delegateIcon, String toolTipText, URL url, int imageType, int width, int height) {
             // BufferedImage must have width/height > 0.
-            super(Math.max(1, delegateIcon.getIconWidth()),
-                    Math.max(1, delegateIcon.getIconHeight()), imageType);
+            super(Math.max(1, width), Math.max(1, height), imageType);
             this.delegateIcon = delegateIcon;
             this.toolTipText = toolTipText;
             this.url = url;

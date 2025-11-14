@@ -78,6 +78,10 @@ public abstract class CachedHiDPIIcon implements Icon {
         this.height = height;
     }
 
+    protected double getScale(CachedImageKey key) {
+        return key.getScale();
+    }
+    
     /**
      * Get a scaled bitmap image of this icon. This method may not be called if either of the icon's
      * dimensions are zero.
@@ -87,7 +91,7 @@ public abstract class CachedHiDPIIcon implements Icon {
         if (ret != null) {
             return ret;
         }
-        final double scale = key.getScale();
+        final double scale = getScale(key);
         final int deviceWidth = (int) Math.ceil(getIconWidth() * scale);
         final int deviceHeight = (int) Math.ceil(getIconHeight() * scale);
         final Image img =
@@ -188,11 +192,11 @@ public abstract class CachedHiDPIIcon implements Icon {
           colorModel.createCompatibleWritableRaster(deviceWidth, deviceHeight),
           colorModel.isAlphaPremultiplied(), null);
     }
-
+    
     /**
      * Key for image cache map. Immutable.
      */
-    private static final class CachedImageKey {
+    protected static final class CachedImageKey {
         /* The ColorModel is the only field in GraphicsConfiguration that is needed to create a
         compatible BufferedImage. So include only that one, plus the HiDPI scaling factor, in the
         cache key. */
@@ -217,7 +221,7 @@ public abstract class CachedHiDPIIcon implements Icon {
             {
                 scale = tx.getScaleX();
             } else {
-                scale = 1.0;
+                scale = ImageUtilities.getUserScaleFactor();
             }
             GraphicsConfiguration gconf = g.getDeviceConfiguration();
             /* Always use the same transparency mode for the cached images, so we don't end up with
