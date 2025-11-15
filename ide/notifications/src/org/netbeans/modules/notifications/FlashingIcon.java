@@ -225,7 +225,7 @@ class FlashingIcon extends JLabel implements MouseListener, PropertyChangeListen
         } else {
             icon = ImageUtilities.loadImageIcon("org/netbeans/modules/notifications/resources/notifications.png", true);
         }
-        Font font = getFont().deriveFont(10f);
+        Font font = getFont().deriveFont(10f * ImageUtilities.getUserScaleFactor());
         Color color;
         if ("Nimbus".equals(UIManager.getLookAndFeel().getID())) {
             color = isError ? Color.RED : Color.BLACK;
@@ -252,12 +252,12 @@ class FlashingIcon extends JLabel implements MouseListener, PropertyChangeListen
 
         @Override
         public int getIconWidth() {
-            return 16;
+            return baseIcon.getIconWidth();
         }
 
         @Override
         public int getIconHeight() {
-            return 16;
+            return baseIcon.getIconHeight();
         }
 
         @Override
@@ -268,9 +268,9 @@ class FlashingIcon extends JLabel implements MouseListener, PropertyChangeListen
             g.setColor(color);
             if (unread < 10) {
                 g.setFont(font.deriveFont(Font.BOLD));
-                g.drawString(Integer.toString(unread), x + 5, y + 10);
+                g.drawString(Integer.toString(unread), x + font.getSize() / 2, y + font.getSize());
             } else if (unread < 100) {
-                g.drawString(Integer.toString(unread), x + 3, y + 10);
+                g.drawString(Integer.toString(unread), x + Math.min(3, font.getSize() / 4), y + font.getSize());
             } else {
                 g.drawString("...", x + 2, y + 10);
             }
