@@ -1084,15 +1084,7 @@ public final class ImageUtilities {
     }
 
     public static float getUserScaleFactor() {
-        try {
-            String prop = System.getProperty("user.scale.factor");
-            if (prop != null && !prop.isEmpty()) {
-                return Float.parseFloat(prop);
-            }
-        } catch (Exception ex) {
-            // ignore
-        }
-        return 1f;
+        return UIScale.getUserScaleFactor();
     }
 
     private static void ensureLoaded(Image image) {
