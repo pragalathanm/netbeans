@@ -20,6 +20,7 @@
 package org.netbeans.modules.notifications;
 
 import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Composite;
@@ -49,6 +50,7 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Area;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
 import java.awt.geom.RoundRectangle2D;
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
@@ -243,7 +245,7 @@ class BalloonManager {
             this.content = content;
             this.defaultAction = defaultAction;
             this.timeoutMillis = timeoutMillis;
-            content.setOpaque( false );
+            //content.setOpaque( false );
 
             btnDismiss = new DismissButton();
             btnDismiss.addActionListener( new ActionListener() {
@@ -418,16 +420,16 @@ class BalloonManager {
         @Override
         protected void paintComponent(Graphics g) {
             Graphics2D g2d = (Graphics2D)g;
-            
+    
             g2d.setRenderingHint( RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON );
-            
+    
             Composite oldC = g2d.getComposite();
             Shape s = getMask( getWidth(), getHeight() );
-
+    
             g2d.setComposite( AlphaComposite.getInstance( AlphaComposite.SRC_OVER, 0.25f*currentAlpha ) );
             g2d.setColor( Color.black );
             g2d.fill( getShadowMask(s) );
-            
+    
             g2d.setColor( UIManager.getColor( "ToolTip.background" ) ); //NOI18N
             g2d.setComposite( AlphaComposite.getInstance( AlphaComposite.SRC_OVER, currentAlpha ) );
             Point2D p1 = s.getBounds().getLocation();
@@ -441,7 +443,7 @@ class BalloonManager {
             g2d.draw(s);
             g2d.setComposite( oldC );
         }
-
+        
         @Override
         protected void paintChildren(Graphics g) {
             Graphics2D g2d = (Graphics2D)g;
