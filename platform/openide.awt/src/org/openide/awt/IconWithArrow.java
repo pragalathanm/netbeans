@@ -70,8 +70,9 @@ class IconWithArrow implements Icon {
                 g.drawLine( x+orig.getIconWidth()+1, y, 
                             x+orig.getIconWidth()+1, y+getIconHeight() );
                 g.setColor( darker );
-                g.drawLine( x+orig.getIconWidth()+2, y, 
-                            x+orig.getIconWidth()+2, y+getIconHeight() );
+                final int lineWidth = Math.round(Math.max(1, ImageUtilities.getUserScaleFactor()));
+                int x1 = x+orig.getIconWidth()+2;
+                g.fillRect(x1, y, lineWidth , getIconHeight()+1 );
             }
         }
     }
@@ -96,7 +97,7 @@ class IconWithArrow implements Icon {
         private final boolean disabled;
 
         private ArrowIcon(boolean disabled) {
-          super(5, 4);
+          super((int) (5 * ImageUtilities.getUserScaleFactor()), (int) (4 * ImageUtilities.getUserScaleFactor()));
           this.disabled = disabled;
         }
 
