@@ -272,7 +272,7 @@ public class UIScale {
         return font.getSize() / fontSizeDivider;
     }
 
-    private static boolean isUserScalingEnabled() {
+    public static boolean isUserScalingEnabled() {
         return getBoolean(UI_SCALE_ENABLED, true);
     }
     
